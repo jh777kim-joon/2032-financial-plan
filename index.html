@@ -1,0 +1,418 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>2032 은퇴 시뮬레이터</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap">
+<style>
+/* Layout: 좌측 가정값 패널 + 우측 판정·차트·연도표. 모바일은 1열로 쌓음 */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#14213d; --muted:#5a6478; --line:#dde2ea; --soft:#eef1f6;
+  --accent:#b23a3a; --good:#2f7d5b; --warn:#a86a12; --bad:#b23a3a;
+  --d-sp:#1f3a6e; --d-cash:#9db4d6; --d-dc:#c0843a; --d-jpa:#4f8a76; --d-wpa:#8e64a8;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e131d; --surface:#161d2b; --ink:#e6eaf2; --muted:#9aa4b7; --line:#29324a; --soft:#1c2435;
+  --accent:#e06a62; --good:#5fbf92; --warn:#e0a548; --bad:#e06a62;
+  --d-sp:#7099de; --d-cash:#3f587d; --d-dc:#d9a25f; --d-jpa:#7cb8a3; --d-wpa:#b896cc; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e131d; --surface:#161d2b; --ink:#e6eaf2; --muted:#9aa4b7; --line:#29324a; --soft:#1c2435;
+  --accent:#e06a62; --good:#5fbf92; --warn:#e0a548; --bad:#e06a62;
+  --d-sp:#7099de; --d-cash:#3f587d; --d-dc:#d9a25f; --d-jpa:#7cb8a3; --d-wpa:#b896cc; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:18px}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--ink)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+aside{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px}
+details{border-top:1px solid var(--line);padding-top:8px}
+details:first-of-type{border-top:0;padding-top:0}
+summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0;list-style:none;display:flex;justify-content:space-between}
+summary::after{content:"＋";color:var(--muted)} details[open] summary::after{content:"－"}
+.f{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:8px;align-items:center;padding:3px 0}
+.f label{font-size:12.5px;color:var(--ink)} .f label small{display:block;color:var(--muted);font-size:11px;line-height:1.3}
+.f label .as{color:var(--warn);font-weight:600}
+.f input{width:100%;font-family:var(--f-num);font-size:13px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:var(--soft);color:var(--ink)}
+.toggles{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:10px;margin-top:4px;font-size:13px}
+.toggles label{display:flex;gap:8px;align-items:center;cursor:pointer}
+main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.verdict{border-radius:10px;padding:14px 16px;border:1px solid var(--line);background:var(--surface);display:flex;gap:14px;align-items:flex-start}
+.pill{flex:none;font-weight:700;font-size:12px;padding:4px 10px;border-radius:99px;color:#fff;letter-spacing:.04em}
+.pill.good{background:var(--good)} .pill.warn{background:var(--warn)} .pill.bad{background:var(--bad)}
+.verdict p{margin:0} .verdict .head{font-weight:700;font-size:15px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.kpi .l{font-size:11.5px;color:var(--muted);letter-spacing:.02em}
+.kpi .v{font-family:var(--f-num);font-size:20px;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+.kpi .n{font-size:11.5px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.card h2{font-size:14px;margin:0 0 2px;font-weight:700} .card .cap{color:var(--muted);font-size:12px;margin:0 0 10px}
+.chart{position:relative;height:300px}
+.warns{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.warns li b{color:var(--accent)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--surface)}
+td:first-child,th:first-child{text-align:left}
+tr.ret td{background:var(--soft);font-weight:600}
+tr.neg td{color:var(--bad)}
+.io{display:flex;flex-direction:column;gap:8px}
+.io textarea{width:100%;height:90px;font-family:var(--f-num);font-size:11px;background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+.io .row{display:flex;gap:6px;flex-wrap:wrap}
+.note{font-size:12px;color:var(--muted)}
+.legend-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:middle}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <h1>2032 은퇴 시뮬레이터</h1>
+    <p class="sub">2028년 1월 매각·이사 이후 금융자산 흐름 · 국민연금 + 사학연금 · 금액 단위 만원 (차트는 억원)</p>
+  </div>
+  <div class="presets" id="presets">
+    <button data-p="d">2030 FIRE</button>
+    <button data-p="e">Joon 2031 · 아내 2032</button>
+    <button data-p="a">2032 동시 은퇴</button>
+    <button data-p="b">아내만 2036까지</button>
+    <button data-p="c">2036 동시 은퇴</button>
+  </div>
+</header>
+
+<div class="grid">
+<aside id="inputs"></aside>
+
+<main>
+  <div class="verdict" id="verdict"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <h2>송도 이사: 간다 vs 안 간다</h2>
+    <p class="cap">같은 가정값으로 두 시나리오를 동시에 계산합니다. 차트와 연도표는 왼쪽 '송도 이사 간다' 체크 여부를 따릅니다.</p>
+    <div class="tbl"><table id="cmp"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>계좌별 금융자산 추이</h2>
+    <p class="cap" id="cap1">실거주 15.5억 제외. 결정론적 기본 경로.</p>
+    <div class="chart"><canvas id="c1" aria-label="계좌별 금융자산 추이"></canvas></div>
+  </section>
+
+  <section class="card">
+    <h2>몬테카를로 1,000회: 금융자산 분포</h2>
+    <p class="cap">S&amp;P500 연 수익률을 매년 무작위로 뽑아 1,000번 반복. 띠는 하위 10%~상위 10% 구간, 실선은 중앙값.</p>
+    <div class="chart"><canvas id="c2" aria-label="몬테카를로 분포"></canvas></div>
+  </section>
+
+  <section class="card">
+    <h2>점검 포인트</h2>
+    <ul class="warns" id="warns"></ul>
+  </section>
+
+  <section class="card">
+    <h2>연도별 현금흐름</h2>
+    <p class="cap" id="cap3"></p>
+    <div class="tbl"><table id="tbl"></table></div>
+  </section>
+
+  <section class="card io">
+    <h2>가정값 저장 · 불러오기</h2>
+    <p class="note">입력값은 이 브라우저에 자동 저장됩니다. 다른 기기로 옮길 때는 아래 JSON을 복사해 붙여넣으세요.</p>
+    <textarea id="json" aria-label="가정값 JSON"></textarea>
+    <div class="row">
+      <button id="copy">JSON 복사</button>
+      <button id="apply">붙여넣은 JSON 적용</button>
+      <button id="reset">기본값으로 초기화</button>
+      <span class="note" id="ioMsg"></span>
+    </div>
+  </section>
+</main>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const FIELDS = [
+ ["은퇴 시점", [
+  ["joonRetire","Joon 퇴직 연도",2032,1,"","첫해 1월부터 근로소득 없음"],
+  ["wifeRetire","아내 퇴직 연도",2032,1,"",""],
+  ["wifeBirth","아내 출생 연도",1980,1,"","가정값"],
+  ["joonSev","Joon 명예퇴직금 (세후)",20000,1000,"","퇴직 연도에 수령. 아래 체크 시 적용"],
+  ["wifeSev","아내 명예퇴직금 (세후)",15000,1000,"","교원 명퇴: 재직 20년 이상 요건"],
+ ]],
+ ["2028년 1월 출발 자금", [
+  ["joonCash","Joon 몫 (매각 후)",30000,500,"",""],
+  ["wifeCash","아내 몫 (매각 후)",25000,500,"",""],
+  ["save2027","2027년 추가 저축",5000,500,"",""],
+  ["dc","Joon DC 잔액 (2028년 초)",30000,500,"","현재 2.7억 + 1년 적립·수익 가정"],
+  ["cashTarget","단기채 버퍼 (재직 중)",5000,500,"","나머지는 S&P500"],
+ ]],
+ ["재직 중 현금흐름 (연, 세후)", [
+  ["joonNet","Joon 세후 연소득",7500,100,"","세전 1억 기준 가정값"],
+  ["wifeNet","아내 세후 연소득",4800,100,"","세전 6천 기준 가정값"],
+  ["wage","연봉 인상률 %",2,0.5,"",""],
+  ["ps","연금저축 납입 (1인)",600,50,"","세액공제 13.2%"],
+  ["irp","IRP 납입 (1인)",300,50,"",""],
+  ["dcC","DC 회사 적립 (연)",830,10,"","연봉의 1/12"],
+  ["extra","재직 중 추가 지출 (월)",90,10,"","차량·경조사·여행. 2028 저축 ≈ 5천에 맞춤"],
+ ]],
+ ["지출 (현재가치, 월)", [
+  ["living","생활비 (교육비 제외)",300,10,"",""],
+  ["eduMult","교육비 배율",1,0.1,"","1.5 = 자취·재수 등"],
+  ["health","은퇴 후 건강보험료",30,5,"","지역가입자 가정"],
+  ["bufYears","은퇴 후 현금 버퍼 (년치)",1,0.5,"","권장 2년"],
+  ["inf","물가상승률 %",2.5,0.1,"",""],
+ ]],
+ ["기대수익률 (연, 세후)", [
+  ["sp","S&P500 (원화)",7,0.5,"","연금계좌도 동일 적용"],
+  ["vol","S&P500 변동성 %",16,1,"","몬테카를로용"],
+  ["bond","단기채",3,0.25,"",""],
+  ["dcR","DC 운용",5,0.5,"",""],
+ ]],
+ ["공적연금 (현재가치, 월)", [
+  ["npM","Joon 국민연금 (만 65세)",150,10,"","가정값. 공단 예상연금 조회로 교체"],
+  ["npEarly","국민연금 조기수령 (년)",0,1,"","1년당 6% 감액, 최대 5"],
+  ["hireYear","아내 임용 연도",2008,1,"","가정값"],
+  ["tpBase","아내 기준소득월액",500,10,"",""],
+  ["tpRate","사학연금 지급률 %",1.7,0.05,"","재직 1년당"],
+  ["tpAge","사학연금 개시 연령",65,1,"",""],
+  ["tpEarly","사학연금 조기수령 (년)",0,1,"","1년당 5% 감액, 최대 5"],
+  ["tpOverride","사학연금 월액 직접입력",0,10,"","0이면 자동 계산"],
+ ]],
+ ["송도 이사 옵션", [
+  ["moveYear","이사 연도",2032,1,"","둘째 대학 입학 시점"],
+  ["homeNow","철산자이더헤리티지 시세 (2026년)",155000,1000,"","2028년 1월 입주, 2031년까지 거주"],
+  ["homeG","광명 집값 상승률 %",2,0.5,"",""],
+  ["songdo","송도 집 매수가 (이사 시점)",100000,1000,"",""],
+  ["songdoG","송도 집값 상승률 %",2,0.5,"",""],
+  ["sellCost","매도 비용 % (중개·양도세)",2,0.5,"","12억 초과분 양도세는 세무 확인"],
+  ["buyCost","매수 비용 % (취득세·중개·이사)",4,0.5,"","9억 초과 취득세 약 3.3%"],
+  ["healthMoved","이사 후 건강보험료 (월)",25,5,"","주택 재산 감소 반영"],
+ ]],
+ ["여가비 옵션 (은퇴 후)", [
+  ["leisRate","총 인출 한도 (금융자산 대비 %)",4,0.25,"","연초 금융자산 × 비율 − 기본 순지출 = 여가비"],
+  ["leisCap","여가비 연 상한 (현재가치)",3000,100,"","여행·골프·모임"],
+ ]],
+];
+const ASSUMED = new Set(["wifeBirth","hireYear","npM","joonNet","wifeNet","dc"]);
+const DEFAULTS = {}; FIELDS.forEach(g=>g[1].forEach(f=>DEFAULTS[f[0]]=f[2]));
+const EDU = {2028:250,2029:300,2030:300,2031:300,2032:300,2033:300,2034:150,2035:150};
+const KEY = "retire-sim-v3";
+let P = Object.assign({}, DEFAULTS), opt = {real:true, stress:false, move:true, sevJ:true, sevW:false, leis:true, leisGuard:true};
+try{ const s = JSON.parse(localStorage.getItem(KEY)||"null"); if(s){ Object.assign(P, s.P||{}); Object.assign(opt, s.opt||{}); } }catch(e){}
+
+/* ---------- inputs ---------- */
+const box = document.getElementById("inputs");
+FIELDS.forEach((g,gi)=>{
+  const d = document.createElement("details"); if(gi<2 || gi>=5) d.open = true;
+  d.innerHTML = `<summary>${g[0]}</summary>`;
+  g[1].forEach(([id,label,,step,,note])=>{
+    const row = document.createElement("div"); row.className="f";
+    row.innerHTML = `<label for="${id}">${label}${note?`<small>${ASSUMED.has(id)?'<span class="as">확인 필요 · </span>':''}${note}</small>`:''}</label>
+      <input id="${id}" type="number" step="${step}" inputmode="decimal">`;
+    d.appendChild(row);
+  });
+  box.appendChild(d);
+});
+const tg = document.createElement("div"); tg.className="toggles";
+tg.innerHTML = `<label><input type="checkbox" id="move"> <b>송도 이사 간다</b> (차트·표에 적용)</label>
+  <label><input type="checkbox" id="sevJ"> Joon 명예퇴직금 수령</label>
+  <label><input type="checkbox" id="sevW"> 아내 명예퇴직금 수령</label>
+  <label><input type="checkbox" id="leis"> <b>잉여 여가비 지출</b> (인출 한도 내)</label>
+  <label><input type="checkbox" id="leisGuard"> S&amp;P 하락한 해에는 여가비 0</label>
+  <label><input type="checkbox" id="real"> 현재가치(2026년 원화)로 보기</label>
+  <label><input type="checkbox" id="stress"> 완전 은퇴 첫해 −30%, 이듬해 −10% 하락장</label>`;
+box.appendChild(tg);
+function syncInputs(){ Object.keys(DEFAULTS).forEach(k=>{document.getElementById(k).value=P[k];});
+  document.getElementById("real").checked=opt.real; document.getElementById("stress").checked=opt.stress; document.getElementById("move").checked=!!opt.move; document.getElementById("sevJ").checked=!!opt.sevJ; document.getElementById("sevW").checked=!!opt.sevW; document.getElementById("leis").checked=!!opt.leis; document.getElementById("leisGuard").checked=!!opt.leisGuard; markPreset(); }
+let tmr; box.addEventListener("input",e=>{
+  const t=e.target; if(t.type==="checkbox"){opt[t.id]=t.checked;} else if(t.id in DEFAULTS){ const v=parseFloat(t.value); if(!isNaN(v)) P[t.id]=v; }
+  clearTimeout(tmr); tmr=setTimeout(update,120); markPreset();
+});
+const PRE = {d:[2030,2030], e:[2031,2032], a:[2032,2032], b:[2032,2036], c:[2036,2036]};
+document.getElementById("presets").addEventListener("click",e=>{
+  const p=e.target.dataset.p; if(!p) return; [P.joonRetire,P.wifeRetire]=PRE[p]; syncInputs(); update();
+});
+function markPreset(){ document.querySelectorAll("#presets button").forEach(b=>{const r=PRE[b.dataset.p]; b.classList.toggle("on",r[0]===P.joonRetire&&r[1]===P.wifeRetire);}); }
+
+/* ---------- model ---------- */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gauss(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function pensionInfo(p){
+  const yrs = Math.max(0,p.wifeRetire-p.hireYear);
+  const auto = p.tpBase*p.tpRate/100*yrs;
+  const tpM = (p.tpOverride>0?p.tpOverride:auto)*(1-0.05*Math.min(5,p.tpEarly));
+  const lumpRate = yrs>=20?.39:yrs>=15?.2925:yrs>=10?.2275:yrs>=5?.065:0;
+  return {yrs, tpM: yrs>=10?tpM:0, tpStart: p.wifeBirth+p.tpAge-Math.min(5,p.tpEarly),
+          lump: p.tpBase*yrs*lumpRate, npM: p.npM*(1-0.06*Math.min(5,p.npEarly)), npStart: 1979+65-Math.min(5,p.npEarly)};
+}
+function sim(p, shock, stress, move){
+  const pi = pensionInfo(p), full = Math.max(p.joonRetire,p.wifeRetire);
+  let movedCash = 0;
+  let cash=p.cashTarget, sp=p.joonCash+p.wifeCash+p.save2027-p.cashTarget, dc=p.dc, jpa=0, wpa=0;
+  const rows=[]; let depleted=null, firstWR=null;
+  for(let y=2028;y<=2074;y++){
+    const k=Math.pow(1+p.inf/100,y-2026), g=Math.pow(1+p.wage/100,y-2026);
+    let rS = p.sp/100 + (shock? p.vol/100*shock(y):0);
+    if(stress && y===full) rS=-0.30; else if(stress && y===full+1) rS=-0.10;
+    cash*=1+p.bond/100; sp*=1+rS; dc*=1+p.dcR/100; jpa*=1+rS; wpa*=1+rS;
+    const ja=y-1979, wa=y-p.wifeBirth, jW=y<p.joonRetire, wW=y<p.wifeRetire;
+    const salary=(jW?p.joonNet*g:0)+(wW?p.wifeNet*g:0);
+    const edu=(EDU[y]||0)*p.eduMult*12*k;
+    const moved = move && y>=p.moveYear;
+    let spend=p.living*12*k+edu+((jW||wW)?p.extra*12*k:0)+((!jW&&!wW)?(moved?p.healthMoved:p.health)*12*k:0);
+    const home = moved? p.songdo*Math.pow(1+p.songdoG/100,y-p.moveYear) : p.homeNow*Math.pow(1+p.homeG/100,y-2026);
+    let proceeds = 0;
+    if(move && y===p.moveYear){ proceeds = p.homeNow*Math.pow(1+p.homeG/100,y-2026)*(1-p.sellCost/100) - p.songdo*(1+p.buyCost/100); movedCash = proceeds; }
+    const cJ=jW?p.ps+p.irp:0, cW=wW?p.ps+p.irp:0, refund=(cJ+cW)*0.132;
+    if(jW) dc+=p.dcC*g; jpa+=cJ; wpa+=cW;
+    const np = y>=pi.npStart? pi.npM*12*k:0;
+    const tp = (!wW && y>=pi.tpStart)? pi.tpM*12*k:0;
+    const lump = y===p.wifeRetire? pi.lump*k:0;
+    const totStart = cash+sp+dc+jpa+wpa;
+    const sev = (opt.sevJ && y===p.joonRetire? p.joonSev:0) + (opt.sevW && y===p.wifeRetire? p.wifeSev:0);
+    let leis = 0;
+    if(opt.leis && y>=full){ const baseNeed = spend-np-tp-salary; leis = Math.max(0, Math.min(p.leisRate/100*(totStart+Math.max(0,proceeds)+sev) - baseNeed, p.leisCap*k)); if(opt.leisGuard && rS<0) leis = 0; spend += leis; }
+    let net = salary+np+tp+refund+lump+proceeds+sev-spend-cJ-cW, drawRet=0, penalty=0;
+    if(y===full) firstWR = Math.max(0,spend-np-tp-salary)/Math.max(1,totStart+Math.max(0,proceeds)+sev);
+    if(net<0){
+      let need=-net;
+      if(!jW && ja>=55){const d=Math.min(need,3000*k,dc+jpa), d1=Math.min(d,dc); dc-=d1; jpa-=d-d1; need-=d; drawRet+=d;}
+      if(wa>=55 && need>0){const d=Math.min(need,1500*k,wpa); wpa-=d; need-=d; drawRet+=d;}
+      let d=Math.min(need,cash); cash-=d; need-=d;
+      d=Math.min(need,sp); sp-=d; need-=d;
+      if(need>0){ const pool=dc+jpa+wpa; if(pool>0){ const gross=Math.min(pool,need/0.835); const f=gross/pool; dc-=dc*f; jpa-=jpa*f; wpa-=wpa*f; need-=gross*0.835; penalty+=gross*0.165; } }
+      if(need>1 && depleted===null) depleted=y;
+    } else {
+      const tgt0 = y>=full? p.bufYears*spend : p.cashTarget*k;
+      const top=Math.max(0,Math.min(net,tgt0-cash)); cash+=top; sp+=net-top;
+    }
+    const tgt = y>=full? p.bufYears*spend : p.cashTarget*k;
+    if(cash<tgt && rS>=0){const m=Math.min(tgt-cash,sp); cash+=m; sp-=m;}
+    rows.push({y,k,ja,wa,salary,np,tp,lump:lump+sev,proceeds,home,spend,leis,edu,net,drawRet,penalty,rS,cash,sp,dc,jpa,wpa,tot:cash+sp+dc+jpa+wpa,jW,wW});
+  }
+  return {rows,depleted,firstWR,full,pi,movedCash};
+}
+function monteCarlo(p,n,move){
+  const rng=mulberry(20261025); let ok=0; const years=[]; for(let y=2028;y<=2074;y++)years.push([]);
+  for(let i=0;i<n;i++){
+    const shocks={}; const s=sim(p,y=>shocks[y]??(shocks[y]=gauss(rng)),opt.stress,move);
+    if(s.depleted===null) ok++;
+    s.rows.forEach((r,j)=>years[j].push(opt.real? r.tot/r.k : r.tot));
+  }
+  const pct=(a,q)=>{const b=a.slice().sort((x,y)=>x-y);return b[Math.floor(q*(b.length-1))]};
+  if(n===0) return null;
+  return {success:ok/n, p10:years.map(a=>pct(a,.1)), p50:years.map(a=>pct(a,.5)), p90:years.map(a=>pct(a,.9))};
+}
+
+/* ---------- render ---------- */
+const eok = v => (v/10000);
+const fE = v => (v/10000).toFixed(1)+"억";
+const fM = v => Math.round(v).toLocaleString("ko-KR");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let ch1, ch2;
+function update(){
+  try{localStorage.setItem(KEY,JSON.stringify({P,opt}))}catch(e){}
+  document.getElementById("json").value = JSON.stringify(P,null,0);
+  const sNo = sim(P,null,opt.stress,false), sYes = sim(P,null,opt.stress,true);
+  const mNo = monteCarlo(P,1000,false), mYes = monteCarlo(P,1000,true);
+  const base = opt.move? sYes:sNo, mc = opt.move? mYes:mNo, R=base.rows, pi=base.pi;
+  const V = r => opt.real? 1/r.k : 1;
+  // comparison table
+  const yrRow = (s,y)=> s.rows.find(r=>r.y===y);
+  const last = s=> s.rows[s.rows.length-1];
+  const cmpRows = [
+    ["이사 시 확보 현금 (순)", "—", (()=>{const r=yrRow(sYes,P.moveYear); return r? fE(r.proceeds*V(r)) : "—";})()],
+    ["95세 자금 유지 확률", (mNo.success*100).toFixed(0)+"%", (mYes.success*100).toFixed(0)+"%"],
+    ["첫해 순인출률", sNo.firstWR!==null?(sNo.firstWR*100).toFixed(1)+"%":"—", sYes.firstWR!==null?(sYes.firstWR*100).toFixed(1)+"%":"—"],
+    ["2040년 금융자산", fE(yrRow(sNo,2040).tot*V(yrRow(sNo,2040))), fE(yrRow(sYes,2040).tot*V(yrRow(sYes,2040)))],
+    ["2040년 주택가치", fE(yrRow(sNo,2040).home*V(yrRow(sNo,2040))), fE(yrRow(sYes,2040).home*V(yrRow(sYes,2040)))],
+    ["2040년 순자산 (주택 포함)", fE((yrRow(sNo,2040).tot+yrRow(sNo,2040).home)*V(yrRow(sNo,2040))), fE((yrRow(sYes,2040).tot+yrRow(sYes,2040).home)*V(yrRow(sYes,2040)))],
+    ["2074년 금융자산 (하위 10%)", fE(mNo.p10[mNo.p10.length-1]), fE(mYes.p10[mYes.p10.length-1])],
+  ];
+  document.getElementById("cmp").innerHTML = `<thead><tr><th>항목${opt.real?" (현재가치)":""}</th><th>안 간다 (광명 유지)</th><th>간다 (송도 ${fE(P.songdo)})</th></tr></thead><tbody>${cmpRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</tbody>`;
+  const atFull = R.find(r=>r.y===base.full) || R[R.length-1];
+  const preFull = R.find(r=>r.y===base.full-1) || R[0];
+  const minRow = R.filter(r=>r.y>=base.full).reduce((a,b)=> (b.tot*V(b) < a.tot*V(a) ? b:a), atFull);
+  const r28 = R[0], save28 = r28.net + (r28.jW?P.ps+P.irp:0) + (r28.wW?P.ps+P.irp:0);
+  const tpStartY = pi.tpStart, gapStart = base.full, gapEnd = Math.min(pi.npStart, tpStartY);
+  const s = mc.success;
+  const cls = base.depleted? "bad" : s>=0.85? "good" : s>=0.7? "warn":"bad";
+  const label = {good:"안전권",warn:"주의",bad:"위험"}[cls];
+  document.getElementById("verdict").innerHTML = `<span class="pill ${cls}">${label}</span><div>
+    <p class="head">${P.joonRetire===P.wifeRetire?`${P.joonRetire}년 부부 동시 은퇴`:`Joon ${P.joonRetire}년 · 아내 ${P.wifeRetire}년 퇴직`}${opt.move?` + ${P.moveYear}년 송도 이사`:""}${opt.sevJ||opt.sevW?` + 명퇴금 ${fE((opt.sevJ?P.joonSev:0)+(opt.sevW?P.wifeSev:0))}`:""}: 95세(2074년)까지 자금 유지 확률 ${(s*100).toFixed(0)}%</p>
+    <p class="note">기본 경로 ${base.depleted?`<b style="color:var(--bad)">${base.depleted}년 고갈 (Joon 만 ${base.depleted-1979}세)</b>`:"고갈 없음"} · 완전 은퇴 직전 금융자산 ${fE(preFull.tot*V(preFull))}${opt.real?" (현재가치)":""} · 첫해 순인출률 ${base.firstWR!==null?(base.firstWR*100).toFixed(1)+"%":"인출 없음"}</p></div>`;
+  const LR = R.filter(r=>r.y>=base.full && r.y<base.full+20);
+  const avgLeis = LR.length? LR.reduce((a,r)=>a+r.leis/r.k,0)/LR.length : 0;
+  const leisYears = LR.filter(r=>r.leis>1).length;
+  const kp = [
+    ["완전 은퇴 직전 금융자산", fE(preFull.tot*V(preFull)), `${base.full-1}년 말${opt.real?" · 현재가치":""}`],
+    ["첫해 순인출률", base.firstWR!==null?(base.firstWR*100).toFixed(1)+"%":"—", "안전 기준 3.5~4%"],
+    ["은퇴 후 최저 잔고", fE(minRow.tot*V(minRow)), `${minRow.y}년 (만 ${minRow.ja}세)`],
+    ["95세 유지 확률", (s*100).toFixed(0)+"%", "몬테카를로 1,000회"],
+    ["사학연금 월액", fM(pi.tpM)+"만", `재직 ${pi.yrs}년 · ${tpStartY}년 개시 · 현재가치`],
+    ["국민연금 월액", fM(pi.npM)+"만", `${pi.npStart}년 개시 · 현재가치`],
+    ["연금 공백 기간", Math.max(0,gapEnd-gapStart)+"년", `${gapStart}~${gapEnd-1} 자산만으로 생활`],
+    ["연평균 여가비", opt.leis? fM(avgLeis)+"만" : "꺼짐", `은퇴 후 20년 · 현재가치 · ${leisYears}년 지출`],
+    ["2028년 저축 검산", fM(save28)+"만", "연금계좌 납입 포함 · 목표 ≈ 5,000"],
+  ];
+  document.getElementById("kpis").innerHTML = kp.map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="n">${k[2]}</div></div>`).join("");
+
+  // warnings
+  const W=[];
+  const peak = R.filter(r=>r.y>=base.full&&r.y<=2035);
+  const bufNeed = peak.length? peak[0].spend : 0;
+  if(P.bufYears<2) W.push(`<b>현금 버퍼가 얇습니다.</b> 은퇴 후 버퍼 ${P.bufYears}년치는 하락장 1번에 소진됩니다. S&P500 100% 구조라면 최소 2년치(약 ${fE(bufNeed*2/ (opt.real?peak[0]?.k||1:1))})를 단기채로 두는 편이 안전합니다.`);
+  if(base.firstWR!==null && base.firstWR>0.05) W.push(`<b>첫해 인출률 ${(base.firstWR*100).toFixed(1)}%.</b> 두 자녀 대학 동시 재학 구간과 은퇴가 겹칩니다. 2032~35년 교육비는 은퇴 전에 별도 버킷으로 떼어 두세요.`);
+  if(gapEnd-gapStart>=8) W.push(`<b>연금 공백 ${gapEnd-gapStart}년.</b> 이 구간은 금융자산만으로 버팁니다. 사학연금 조기수령(감액)과 비교해 보세요.`);
+  if(P.wifeRetire<P.hireYear+20) W.push(`<b>아내 재직 20년 미만.</b> 사학연금 퇴직수당 지급률이 크게 낮아집니다.`);
+  if(P.joonRetire<2034) W.push(`<b>Joon DC는 만 55세(2034년)부터 연금 수령이 유리합니다.</b> 그 전 인출이 필요해지면 모델은 16.5% 세금 손실을 반영합니다.`);
+  W.push(`<b>계좌 설계 점검:</b> 일반계좌 S&P500 외에 ISA(연 2,000만, 비과세 한도 후 9.9% 분리과세)를 부부 각각 활용하면 같은 수익률에서 세후 자산이 늘어납니다. 모델에는 반영하지 않았습니다.`);
+  W.push(`<b>환율:</b> S&P500은 원화 환산 수익률입니다. 은퇴 직후 원화 강세가 겹치면 하락장과 같은 효과가 납니다.`);
+  document.getElementById("warns").innerHTML = W.map(w=>`<li>${w}</li>`).join("");
+
+  // charts
+  const labels = R.map(r=>r.y);
+  const ds = (key,name,color)=>({label:name,data:R.map(r=>eok(r[key]*V(r))),borderColor:css(color),backgroundColor:css(color),fill:true,pointRadius:0,borderWidth:1,stack:"a",tension:.2});
+  const grid = css("--line"), txt = css("--muted");
+  const common = {responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{labels:{color:txt,boxWidth:10,font:{size:11}}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toFixed(1)}억`}}},
+    scales:{x:{ticks:{color:txt,maxRotation:0,autoSkip:true,maxTicksLimit:12},grid:{color:grid}},y:{ticks:{color:txt,callback:v=>v+"억"},grid:{color:grid}}}};
+  const d1 = [ds("sp","S&P500 (일반)","--d-sp"),ds("cash","단기채","--d-cash"),ds("dc","Joon DC","--d-dc"),ds("jpa","Joon 연금저축·IRP","--d-jpa"),ds("wpa","아내 연금저축·IRP","--d-wpa")];
+  const o1 = JSON.parse(JSON.stringify(common)); o1.scales.y.stacked=true; o1.plugins.tooltip.callbacks={label:c=>`${c.dataset.label}: ${c.parsed.y.toFixed(1)}억`};
+  if(ch1) ch1.destroy(); ch1 = new Chart(document.getElementById("c1"),{type:"line",data:{labels,datasets:d1},options:o1});
+  const sc = css("--d-sp"), ac = css("--accent");
+  const d2 = [
+    {label:"상위 10%",data:mc.p90.map(eok),borderColor:"transparent",backgroundColor:sc+"33",fill:"+1",pointRadius:0},
+    {label:"하위 10%",data:mc.p10.map(eok),borderColor:ac,borderDash:[4,3],borderWidth:1.5,fill:false,pointRadius:0},
+    {label:"중앙값",data:mc.p50.map(eok),borderColor:sc,borderWidth:2,fill:false,pointRadius:0}];
+  const o2 = JSON.parse(JSON.stringify(common)); o2.plugins.tooltip.callbacks={label:c=>`${c.dataset.label}: ${c.parsed.y.toFixed(1)}억`};
+  if(ch2) ch2.destroy(); ch2 = new Chart(document.getElementById("c2"),{type:"line",data:{labels,datasets:d2},options:o2});
+  document.getElementById("cap1").textContent = `실거주 15.5억 제외. 결정론적 기본 경로${opt.stress?" + 은퇴 직후 하락장":""}. ${opt.real?"현재가치(2026년 원화)":"명목 금액"}.`;
+
+  // table
+  document.getElementById("cap3").textContent = `${opt.real?"현재가치":"명목"}, 만원. 순현금흐름 = 근로소득 + 연금 + 퇴직수당 − 지출 − 연금계좌 납입. 음수는 자산에서 인출.`;
+  const h = ["연도","Joon","근로소득","국민연금","사학연금·퇴직금","교육비","여가비","총지출","순현금흐름","총 금융자산","주택가치"];
+  document.getElementById("tbl").innerHTML = `<thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${
+    R.filter(r=>r.y<=2050 || r.y%5===0).map(r=>{const v=V(r); return `<tr class="${r.y===base.full?"ret":""} ${r.tot<1?"neg":""}"><td>${r.y}</td><td>${r.ja}세</td><td>${fM(r.salary*v)}</td><td>${fM(r.np*v)}</td><td>${fM((r.tp+r.lump)*v)}</td><td>${fM(r.edu*v)}</td><td>${fM(r.leis*v)}</td><td>${fM(r.spend*v)}</td><td>${fM(r.net*v)}</td><td>${fE(r.tot*v)}</td><td>${fE(r.home*v)}</td></tr>`}).join("")}</tbody>`;
+}
+
+/* io */
+document.getElementById("copy").addEventListener("click",()=>{const t=document.getElementById("json"); const m=document.getElementById("ioMsg");
+  navigator.clipboard.writeText(t.value).then(()=>m.textContent="복사했습니다").catch(()=>{t.select();m.textContent="선택됨. Ctrl/⌘+C로 복사하세요";});});
+document.getElementById("apply").addEventListener("click",()=>{const m=document.getElementById("ioMsg");
+  try{const o=JSON.parse(document.getElementById("json").value); Object.keys(DEFAULTS).forEach(k=>{if(typeof o[k]==="number")P[k]=o[k]}); syncInputs(); update(); m.textContent="적용했습니다";}catch(e){m.textContent="JSON 형식이 올바르지 않습니다";}});
+document.getElementById("reset").addEventListener("click",()=>{P=Object.assign({},DEFAULTS); opt={real:true,stress:false,move:true,sevJ:true,sevW:false,leis:true,leisGuard:true}; syncInputs(); update(); document.getElementById("ioMsg").textContent="기본값으로 돌렸습니다";});
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",update); new MutationObserver(update).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]}); }catch(e){}
+syncInputs(); update();
+</script>
+
+</body></html>
